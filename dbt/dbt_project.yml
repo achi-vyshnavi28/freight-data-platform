@@ -1,0 +1,36 @@
+name: freight
+version: "1.0.0"
+config-version: 2
+profile: freight
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+analysis-paths: ["analyses"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  freight:
+    staging:
+      +schema: staging
+      +materialized: view
+    intermediate:
+      +schema: intermediate
+      +materialized: table
+    marts:
+      +schema: marts
+      +materialized: table
+    quality:
+      +schema: quality
+      +materialized: view
+
+seeds:
+  freight:
+    +schema: seeds
+
+data_tests:
+  freight:
+    +store_failures: true
+    +schema: quality

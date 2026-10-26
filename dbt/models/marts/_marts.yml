@@ -1,0 +1,55 @@
+version: 2
+
+models:
+  - name: fct_shipments
+    description: One row per valid shipment with trip metrics, invoice and the contract rate in force at dispatch.
+    columns:
+      - name: shipment_id
+        data_tests: [unique, not_null]
+      - name: transporter
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_transporter')
+                field: transporter
+      - name: lane
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_lane')
+                field: lane
+      - name: contracted_rate
+        description: Rate effective on the dispatch date. Null means no contract covers the lane, which must not happen.
+        data_tests: [not_null]
+      - name: transit_hours
+        data_tests:
+          - positive_or_null
+
+  - name: dim_transporter
+    columns:
+      - name: transporter
+        data_tests: [unique, not_null]
+      - name: gstin
+        data_tests: [valid_gstin]
+
+  - name: dim_lane
+    columns:
+      - name: lane
+        data_tests: [unique, not_null]
+
+  - name: mart_transporter_scorecard
+    columns:
+      - name: transporter
+        data_tests: [unique]
+      - name: on_time_pct
+        data_tests:
+          - between:
+              arguments:
+                low: 0
+                high: 100
+
+  - name: mart_daily_ops
+    columns:
+      - name: day
+        data_tests: [unique, not_null]

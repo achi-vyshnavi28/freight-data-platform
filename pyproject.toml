@@ -1,0 +1,32 @@
+[project]
+name = "freight-data-platform"
+version = "0.1.0"
+description = "End-to-end freight data pipeline: ingest -> Postgres -> dbt -> quality checks -> marts -> dashboards, with AI-assisted SQL."
+requires-python = ">=3.11"
+dependencies = [
+  "psycopg[binary]>=3.2",
+  "dbt-core>=1.10,<1.12",
+  "dbt-postgres>=1.9",
+  "boto3>=1.34",
+  "sqlglot>=25",
+  "anthropic>=2.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6", "moto[s3]>=5"]
+airflow = ["apache-airflow>=2.10"]
+
+[tool.setuptools]
+packages = ["fdp", "fdp.ai"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["E501"]

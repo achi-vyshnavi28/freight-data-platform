@@ -1,0 +1,12 @@
+freight:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('FDP_PG_HOST', 'localhost') }}"
+      port: "{{ env_var('FDP_PG_PORT', '5432') | int }}"
+      user: "{{ env_var('FDP_PG_USER', 'fdp') }}"
+      password: "{{ env_var('FDP_PG_PASSWORD', 'fdp') }}"
+      dbname: "{{ env_var('FDP_PG_DB', 'fdp') }}"
+      schema: public
+      threads: 4

@@ -1,0 +1,52 @@
+version: 2
+
+models:
+  - name: stg_tms__shipments
+    description: Latest snapshot per shipment, parsed and normalised. Rows with quality_issue are quarantined downstream.
+    columns:
+      - name: shipment_id
+        data_tests: [unique, not_null]
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['BOOKED', 'IN_TRANSIT', 'DELIVERED']
+      - name: vehicle_no
+        data_tests: [not_null]
+      - name: vehicle_class_t
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [10, 20]
+                quote: false
+
+  - name: stg_gps__pings
+    description: Deduplicated GPS pings (incremental). quality_issue flags null-island fixes and speed spikes.
+    columns:
+      - name: ping_id
+        data_tests: [unique, not_null]
+
+  - name: stg_erp__invoices
+    description: Latest revision of each ERP invoice with arithmetic and tax-type checks.
+    columns:
+      - name: invoice_id
+        data_tests: [unique, not_null]
+      - name: seller_gstin
+        data_tests: [not_null, valid_gstin]
+      - name: buyer_gstin
+        data_tests: [valid_gstin]
+      - name: arithmetic_ok
+        description: taxable + CGST + SGST + IGST equals the printed total (within Rs 1).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [true]
+                quote: false
+              config:
+                severity: warn  # a wrong invoice is a business finding, not a pipeline failure
+
+  - name: stg_rates__rate_cards
+    data_tests:
+      - dbt_utils_free_unique_combination:
+          arguments:
+            columns: [origin, destination, vehicle_class_t, effective_from]

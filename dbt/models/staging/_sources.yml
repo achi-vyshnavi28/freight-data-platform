@@ -1,0 +1,19 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    description: Landing tables. Values are kept as text exactly as the source sent them.
+    loaded_at_field: _loaded_at
+    tables:
+      - name: tms_shipments
+        description: Daily TMS exports. One row per status change, so a shipment appears several times.
+        freshness:
+          warn_after: { count: 26, period: hour }
+          error_after: { count: 50, period: hour }
+      - name: gps_pings
+        description: Telematics pings from object storage. Duplicated, unordered, occasionally garbage.
+      - name: erp_invoices
+        description: Incremental extracts from the ERP. Each revision of an invoice is a new row.
+      - name: rate_cards
+        description: Contract lane rates with effective-from dates.
