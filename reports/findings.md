@@ -1,6 +1,6 @@
 # Freight operations findings
 
-_Generated 2026-10-26 14:56 by `python -m fdp.pipeline report` from the dbt marts._
+_Generated 2026-10-26 15:07 by `python -m fdp.pipeline report` from the dbt marts._
 
 ## Headline
 - **1,193 delivered shipments**, **75.7% on time**, ₹53,731,170 freight billed.

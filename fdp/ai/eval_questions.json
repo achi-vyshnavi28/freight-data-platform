@@ -1,0 +1,18 @@
+[
+  {"question": "Which transporter has the highest share of overbilled invoices?",
+   "gold": "select transporter from marts.mart_transporter_scorecard order by overbilled_pct desc limit 1"},
+  {"question": "What is the on-time percentage for each lane, worst first?",
+   "gold": "select lane, round(100.0 * avg(case when on_time then 1 else 0 end), 1) as on_time_pct from marts.fct_shipments where on_time is not null group by lane order by on_time_pct"},
+  {"question": "How much did we pay above contract rates in total?",
+   "gold": "select sum(freight_variance) from marts.fct_shipments where is_overbilled"},
+  {"question": "How many delivered shipments were never invoiced?",
+   "gold": "select count(*) from marts.fct_shipments where status = 'DELIVERED' and not is_invoiced"},
+  {"question": "Top 5 overbilled invoices by amount over contract",
+   "gold": "select invoice_id, freight_variance from marts.mart_overbilling order by freight_variance desc limit 5"},
+  {"question": "Average transit hours on Hyderabad to Mumbai",
+   "gold": "select round(avg(transit_hours), 1) from marts.fct_shipments where lane = 'Hyderabad -> Mumbai'"},
+  {"question": "Which day had the most late deliveries?",
+   "gold": "select day from marts.mart_daily_ops order by delivered_late desc, day limit 1"},
+  {"question": "For each transporter, how many shipments had a stop longer than an hour?",
+   "gold": "select transporter, count(*) from marts.fct_shipments where long_stops > 0 group by transporter"}
+]

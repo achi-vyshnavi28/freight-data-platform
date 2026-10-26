@@ -53,9 +53,16 @@ ALIASES = {
     "Nagpur": ["Nagpur", "NAGPUR"],
 }
 LANES = [
-    ("Hyderabad", "Chennai"), ("Hyderabad", "Bangalore"), ("Hyderabad", "Mumbai"), ("Hyderabad", "Pune"),
-    ("Hyderabad", "Vijayawada"), ("Hyderabad", "Visakhapatnam"), ("Hyderabad", "Nagpur"), ("Chennai", "Hyderabad"),
-    ("Bangalore", "Hyderabad"), ("Mumbai", "Hyderabad"),
+    ("Hyderabad", "Chennai"),
+    ("Hyderabad", "Bangalore"),
+    ("Hyderabad", "Mumbai"),
+    ("Hyderabad", "Pune"),
+    ("Hyderabad", "Vijayawada"),
+    ("Hyderabad", "Visakhapatnam"),
+    ("Hyderabad", "Nagpur"),
+    ("Chennai", "Hyderabad"),
+    ("Bangalore", "Hyderabad"),
+    ("Mumbai", "Hyderabad"),
 ]
 TRANSPORTERS = {
     # name: (state, date format in their TMS export, overbill probability, punctuality factor)
@@ -149,8 +156,18 @@ def build_shipments(n: int, start: date, days: int, rng: random.Random) -> list[
         delivered = dispatched + timedelta(hours=drive_h + sum(m for _, m in stops) / 60)
         out.append(
             Shipment(
-                f"SHP{100000 + i}", t, o, d, "", int(round(rng.uniform(0.55, 0.97) * cap * 1000, -1)),
-                cap, booked, dispatched, promised, delivered, stops,
+                f"SHP{100000 + i}",
+                t,
+                o,
+                d,
+                "",
+                int(round(rng.uniform(0.55, 0.97) * cap * 1000, -1)),
+                cap,
+                booked,
+                dispatched,
+                promised,
+                delivered,
+                stops,
             )
         )
     # Assign trucks in dispatch order (greedy interval scheduling): reuse a free truck, else add one.
@@ -165,17 +182,32 @@ def build_shipments(n: int, start: date, days: int, rng: random.Random) -> list[
 
 # ---------------------------------------------------------------- TMS exports (CSV per day)
 
+
 def _fmt_weight(rng: random.Random, kg: int) -> str:
     return rng.choice([f"{kg}", f"{kg} kg", f"{kg / 1000:.2f} MT", f"{kg:,} KGS"])
 
 
 def _fmt_plate(rng: random.Random, plate: str) -> str:
-    p = rng.choice([plate, plate.lower(), f"{plate[:2]} {plate[2:4]} {plate[4:-4]} {plate[-4:]}", f"{plate[:2]}-{plate[2:4]}-{plate[4:]}"])
+    p = rng.choice(
+        [plate, plate.lower(), f"{plate[:2]} {plate[2:4]} {plate[4:-4]} {plate[-4:]}", f"{plate[:2]}-{plate[2:4]}-{plate[4:]}"]
+    )
     return p if rng.random() > 0.05 else f" {p} "
 
 
-TMS_COLUMNS = ["shipment_id", "booked_at", "dispatched_at", "delivered_at", "promised_at", "origin", "destination",
-               "transporter", "vehicle_no", "weight", "status", "updated_at"]
+TMS_COLUMNS = [
+    "shipment_id",
+    "booked_at",
+    "dispatched_at",
+    "delivered_at",
+    "promised_at",
+    "origin",
+    "destination",
+    "transporter",
+    "vehicle_no",
+    "weight",
+    "status",
+    "updated_at",
+]
 
 
 def tms_events(shipments: list[Shipment], rng: random.Random) -> dict[date, list[dict]]:
@@ -183,17 +215,31 @@ def tms_events(shipments: list[Shipment], rng: random.Random) -> dict[date, list
     by_day: dict[date, list[dict]] = {}
     for s in shipments:
         fmt = TRANSPORTERS[s.transporter][1]
-        f = lambda dt: dt.strftime(fmt) if dt else ""  # noqa: E731
+
+        def f(dt: datetime | None, fmt: str = fmt) -> str:
+            return dt.strftime(fmt) if dt else ""
+
         origin, dest = rng.choice(ALIASES[s.origin]), rng.choice(ALIASES[s.destination])
         if rng.random() < 0.004:
             dest = ""  # broken record: staging must quarantine it, not drop it silently
-        base = {"shipment_id": s.shipment_id, "booked_at": f(s.booked_at), "promised_at": f(s.promised_at), "origin": origin,
-                "destination": dest, "transporter": s.transporter, "vehicle_no": _fmt_plate(rng, s.vehicle_no),
-                "weight": _fmt_weight(rng, s.weight_kg)}
+        base = {
+            "shipment_id": s.shipment_id,
+            "booked_at": f(s.booked_at),
+            "promised_at": f(s.promised_at),
+            "origin": origin,
+            "destination": dest,
+            "transporter": s.transporter,
+            "vehicle_no": _fmt_plate(rng, s.vehicle_no),
+            "weight": _fmt_weight(rng, s.weight_kg),
+        }
         for status, at in (("BOOKED", s.booked_at), ("IN_TRANSIT", s.dispatched_at), ("DELIVERED", s.delivered_at)):
-            row = {**base, "status": status, "updated_at": f(at),
-                   "dispatched_at": f(s.dispatched_at) if status != "BOOKED" else "",
-                   "delivered_at": f(s.delivered_at) if status == "DELIVERED" else ""}
+            row = {
+                **base,
+                "status": status,
+                "updated_at": f(at),
+                "dispatched_at": f(s.dispatched_at) if status != "BOOKED" else "",
+                "delivered_at": f(s.delivered_at) if status == "DELIVERED" else "",
+            }
             by_day.setdefault(at.date(), []).append(row)
             if rng.random() < 0.005:
                 by_day[at.date()].append(dict(row))  # exact duplicate, as exports do
@@ -211,6 +257,7 @@ def write_tms(store: ObjectStore, by_day: dict[date, list[dict]]) -> int:
 
 
 # ---------------------------------------------------------------- GPS pings (JSONL.gz per day)
+
 
 def _position(o: str, d: str, frac: float) -> tuple[float, float]:
     (la1, lo1, _), (la2, lo2, _) = CITIES[o], CITIES[d]
@@ -237,8 +284,13 @@ def gps_pings(shipments: list[Shipment], interval_min: int, rng: random.Random) 
                 v = max(0.0, rng.gauss(speed, 6))
                 dist = min(km, dist + v * interval_min / 60)
             lat, lon = _position(s.origin, s.destination, dist / km)
-            ping = {"vehicle_no": s.vehicle_no, "ts": t.isoformat(timespec="seconds"), "lat": round(lat + rng.gauss(0, 0.0004), 5),
-                    "lon": round(lon + rng.gauss(0, 0.0004), 5), "speed_kmph": round(v, 1)}
+            ping = {
+                "vehicle_no": s.vehicle_no,
+                "ts": t.isoformat(timespec="seconds"),
+                "lat": round(lat + rng.gauss(0, 0.0004), 5),
+                "lon": round(lon + rng.gauss(0, 0.0004), 5),
+                "speed_kmph": round(v, 1),
+            }
             r = rng.random()
             if r < 0.002:
                 ping.update(lat=0.0, lon=0.0)  # cold-start GPS fix
@@ -263,6 +315,7 @@ def write_gps(store: ObjectStore, by_day: dict[date, list[dict]]) -> int:
 
 # ---------------------------------------------------------------- rate cards
 
+
 def write_rate_cards(store: ObjectStore) -> int:
     buf = io.StringIO()
     w = csv.writer(buf)
@@ -284,7 +337,7 @@ BUYER_GSTINS: dict[str, str] = {}
 
 def erp_invoices(shipments: list[Shipment], rng: random.Random) -> list[dict]:
     transporter_gstin = {t: gstin(rng, st) for t, (st, *_r) in TRANSPORTERS.items()}
-    for city, (_, _, st) in CITIES.items():
+    for _lat, _lon, st in CITIES.values():
         BUYER_GSTINS.setdefault(st, gstin(rng, st))
     rows = []
     for s in shipments:
@@ -309,10 +362,24 @@ def erp_invoices(shipments: list[Shipment], rng: random.Random) -> list[dict]:
         if rng.random() < 0.01:
             total += rng.choice([100.0, 1000.0, -250.0])  # arithmetic error on the paper
         updated = datetime.combine(inv_date, datetime.min.time()) + timedelta(hours=rng.randint(9, 19))
-        rows.append({"invoice_id": f"INV-{s.shipment_id[3:]}", "shipment_id": s.shipment_id, "transporter": s.transporter,
-                     "seller_gstin": seller, "buyer_gstin": buyer, "invoice_date": inv_date, "freight_amount": freight,
-                     "other_charges": other, "taxable_value": taxable, "cgst": cgst, "sgst": sgst, "igst": igst,
-                     "total_amount": total, "updated_at": updated})
+        rows.append(
+            {
+                "invoice_id": f"INV-{s.shipment_id[3:]}",
+                "shipment_id": s.shipment_id,
+                "transporter": s.transporter,
+                "seller_gstin": seller,
+                "buyer_gstin": buyer,
+                "invoice_date": inv_date,
+                "freight_amount": freight,
+                "other_charges": other,
+                "taxable_value": taxable,
+                "cgst": cgst,
+                "sgst": sgst,
+                "igst": igst,
+                "total_amount": total,
+                "updated_at": updated,
+            }
+        )
     for _ in range(max(1, len(rows) // 150)):  # invoices for shipments the TMS never saw
         ghost = dict(rng.choice(rows))
         ghost.update(invoice_id=f"INV-X{rng.randint(10000, 99999)}", shipment_id=f"SHP{rng.randint(900000, 999999)}")
@@ -332,10 +399,13 @@ def insert_erp(rows: list[dict]) -> None:
 def revise_erp_invoices(fraction: float = 0.05, seed: int = 3) -> int:
     """Simulate the ERP correcting invoices after the fact (extra charges billed, invoice re-issued)."""
     with transaction() as conn:
-        ids = [r[0] for r in conn.execute(
-            "select invoice_id from erp.invoices where abs(hashtext(invoice_id || %s::text)) %% 1000 < %s",
-            (str(seed), int(fraction * 1000)),
-        )]
+        ids = [
+            r[0]
+            for r in conn.execute(
+                "select invoice_id from erp.invoices where abs(hashtext(invoice_id || %s::text)) %% 1000 < %s",
+                (str(seed), int(fraction * 1000)),
+            )
+        ]
         conn.execute(
             """
             update erp.invoices
@@ -349,12 +419,20 @@ def revise_erp_invoices(fraction: float = 0.05, seed: int = 3) -> int:
             """,
             (ids,),
         )
-        conn.execute("update erp.invoices set total_amount = taxable_value + cgst + sgst + igst where invoice_id = any(%s)", (ids,))
+        conn.execute(
+            "update erp.invoices set total_amount = taxable_value + cgst + sgst + igst where invoice_id = any(%s)", (ids,)
+        )
     return len(ids)
 
 
-def generate(shipments: int = 1200, start: date = date(2026, 6, 1), days: int = 92, ping_minutes: int = 2, seed: int = 2026,
-             store: ObjectStore | None = None) -> dict:
+def generate(
+    shipments: int = 1200,
+    start: date = date(2026, 6, 1),
+    days: int = 92,
+    ping_minutes: int = 2,
+    seed: int = 2026,
+    store: ObjectStore | None = None,
+) -> dict:
     rng = random.Random(seed)
     store = store or open_store()
     bootstrap()

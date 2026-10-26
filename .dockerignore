@@ -1,0 +1,5 @@
+.venv
+landing
+dbt/target
+dbt/logs
+__pycache__

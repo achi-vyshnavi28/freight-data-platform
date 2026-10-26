@@ -1,9 +1,9 @@
 """One command per pipeline stage, plus `run` for all of them. Airflow calls the same commands.
 
-    python -m fdp.pipeline generate --shipments 1200
-    python -m fdp.pipeline run                  # load -> dbt build (models + tests) -> report
-    python -m fdp.pipeline load --day 2026-06-15
-    python -m fdp.pipeline report
+python -m fdp.pipeline generate --shipments 1200
+python -m fdp.pipeline run                  # load -> dbt build (models + tests) -> report
+python -m fdp.pipeline load --day 2026-06-15
+python -m fdp.pipeline report
 """
 
 from __future__ import annotations
@@ -48,9 +48,11 @@ def main(argv: list[str] | None = None) -> None:
     g.add_argument("--ping-minutes", type=int, default=2)
     ld = sub.add_parser("load", help="extract + load into raw")
     ld.add_argument("--day", help="only this landing partition (YYYY-MM-DD)")
+    ld.add_argument("--source", choices=["all", "tms", "gps", "erp", "rates"], default="all")
     tr = sub.add_parser("transform", help="dbt seed + build")
     tr.add_argument("--full-refresh", action="store_true")
     sub.add_parser("report", help="write reports/findings.md from the marts")
+    sub.add_parser("triage", help="AI triage of failed/warned dbt tests -> reports/dq_triage.md")
     run = sub.add_parser("run", help="load + transform + report")
     run.add_argument("--day")
     sub.add_parser("reset", help="drop all project schemas")
@@ -62,15 +64,27 @@ def main(argv: list[str] | None = None) -> None:
 
         print(json.dumps(generate(a.shipments, days=a.days, ping_minutes=a.ping_minutes), indent=2))
     elif a.cmd == "load":
-        from .extract_load import load_all
+        from . import extract_load as el
 
-        print(json.dumps(load_all(a.day), indent=2, default=str))
+        bootstrap()
+        steps = {
+            "all": lambda: el.load_all(a.day),
+            "tms": lambda: el.load_tms(a.day),
+            "gps": lambda: el.load_gps(a.day),
+            "erp": el.extract_erp_invoices,
+            "rates": el.load_rate_cards,
+        }
+        print(json.dumps(steps[a.source](), indent=2, default=str))
     elif a.cmd == "transform":
         transform(a.full_refresh)
     elif a.cmd == "report":
         from .report import write_report
 
         print(write_report())
+    elif a.cmd == "triage":
+        from .ai.explain_failures import triage
+
+        print(triage())
     elif a.cmd == "run":
         from .extract_load import load_all
         from .report import write_report

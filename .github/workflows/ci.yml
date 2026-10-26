@@ -1,0 +1,37 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: fdp, POSTGRES_PASSWORD: fdp, POSTGRES_DB: fdp }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fdp" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      AWS_DEFAULT_REGION: us-east-1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install ".[dev]"
+      - run: psql postgresql://fdp:fdp@localhost:5432/fdp -c "create database fdp_test"
+      - name: Lint (Python + SQL compiles)
+        run: |
+          ruff check . && ruff format --check .
+          cd dbt && DBT_PROFILES_DIR=. dbt parse
+      - name: Tests (ingestion, dbt build + data tests, findings, AI guard, dashboards)
+        run: pytest -q
+      - name: End-to-end run on a fresh warehouse
+        run: |
+          python -m fdp.pipeline generate --shipments 300 --days 30 --ping-minutes 5
+          python -m fdp.pipeline run
+          python -m fdp.ai.eval_text_to_sql --check-gold
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: reports/

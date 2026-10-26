@@ -35,7 +35,9 @@ ERP_LOOKBACK = timedelta(hours=1)  # re-read a little behind the watermark to ca
 
 def _start_batch(conn: psycopg.Connection, source: str, key: str | None) -> int:
     with conn.transaction():
-        return conn.execute("insert into meta.load_audit (source, object_key) values (%s, %s) returning batch_id", (source, key)).fetchone()[0]
+        return conn.execute(
+            "insert into meta.load_audit (source, object_key) values (%s, %s) returning batch_id", (source, key)
+        ).fetchone()[0]
 
 
 def _finish_batch(conn: psycopg.Connection, batch_id: int, rows: int | None, error: str | None = None) -> None:
@@ -108,12 +110,15 @@ def _gps_rows(data: bytes) -> Iterable[list]:
 RATE_COLUMNS = ["origin", "destination", "capacity_t", "rate_per_trip", "effective_from"]
 
 
-def load_prefix(prefix: str, source: str, table: str, columns: list[str], rows_of, day: str | None = None,
-                store: ObjectStore | None = None) -> dict:
+def load_prefix(
+    prefix: str, source: str, table: str, columns: list[str], rows_of, day: str | None = None, store: ObjectStore | None = None
+) -> dict:
     store = store or open_store()
     keys = store.list(f"{prefix}/dt={day}" if day else prefix)
     loaded = skipped = rows = 0
-    with connect() as conn:
+    # autocommit: each `conn.transaction()` below is a real transaction, so a failed file's
+    # audit row survives the rollback of its data (inside one big transaction it would vanish too)
+    with connect(autocommit=True) as conn:
         for key in keys:
             n = _load_file(conn, store, key, source, table, columns, rows_of)
             if n is None:
@@ -136,13 +141,27 @@ def load_rate_cards(store: ObjectStore | None = None) -> dict:
     return load_prefix("rates", "rates", "raw.rate_cards", RATE_COLUMNS, _csv_rows(RATE_COLUMNS), None, store)
 
 
-ERP_COLUMNS = ["invoice_id", "shipment_id", "transporter", "seller_gstin", "buyer_gstin", "invoice_date", "freight_amount",
-               "other_charges", "taxable_value", "cgst", "sgst", "igst", "total_amount", "updated_at"]
+ERP_COLUMNS = [
+    "invoice_id",
+    "shipment_id",
+    "transporter",
+    "seller_gstin",
+    "buyer_gstin",
+    "invoice_date",
+    "freight_amount",
+    "other_charges",
+    "taxable_value",
+    "cgst",
+    "sgst",
+    "igst",
+    "total_amount",
+    "updated_at",
+]
 
 
 def extract_erp_invoices() -> dict:
     """Incremental pull from the ERP by updated_at. Staging keeps the latest version per invoice."""
-    with connect() as conn:
+    with connect(autocommit=True) as conn:
         row = conn.execute("select value from meta.watermarks where source = 'erp.invoices'").fetchone()
         since = row[0] - ERP_LOOKBACK if row else None
         batch_id = _start_batch(conn, "erp.invoices", f"since {since.isoformat() if since else 'beginning'}")

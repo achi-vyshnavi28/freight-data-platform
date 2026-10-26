@@ -1,0 +1,13 @@
+apiVersion: 1
+datasources:
+  - name: Freight warehouse
+    uid: freight-pg
+    type: grafana-postgresql-datasource
+    url: db:5432
+    user: grafana_ro          # read-only role from sql/roles.sql: dashboards can never write
+    secureJsonData:
+      password: grafana_ro
+    jsonData:
+      database: fdp
+      sslmode: disable
+      postgresVersion: 1600

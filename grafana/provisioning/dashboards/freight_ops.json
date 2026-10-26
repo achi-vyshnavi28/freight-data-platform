@@ -1,0 +1,285 @@
+{
+  "uid": "freight-ops",
+  "title": "Freight operations",
+  "schemaVersion": 39,
+  "time": {
+    "from": "2026-06-01T00:00:00Z",
+    "to": "2026-09-05T00:00:00Z"
+  },
+  "refresh": "",
+  "tags": [
+    "freight"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "On-time delivery %",
+      "type": "stat",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "freight-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "freight-pg"
+          },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "select round(100.0 * avg(case when on_time then 1 else 0 end), 1) as on_time_pct from marts.fct_shipments where on_time is not null and $__timeFilter(delivered_at)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Overbilled (INR)",
+      "type": "stat",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "freight-pg"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "freight-pg"
+          },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "select coalesce(sum(freight_variance), 0) as overbilled from marts.fct_shipments where is_overbilled and $__timeFilter(dispatched_at)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Delivered, not invoiced",
+      "type": "stat",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "freight-pg"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "freight-pg"
+          },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "select count(*) as cases from marts.mart_revenue_leakage where issue = 'delivered, never invoiced'"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Rows quarantined (last run)",
+      "type": "stat",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "freight-pg"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "freight-pg"
+          },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "select count(*) as rows from quality.quarantine_shipments"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Daily dispatched vs delivered late",
+      "type": "timeseries",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "freight-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 16,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "freight-pg"
+          },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "select day::timestamp as time, dispatched, delivered, delivered_late from marts.mart_daily_ops where $__timeFilter(day::timestamp) order by 1"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Freight billed per day",
+      "type": "timeseries",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "freight-pg"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 4,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "freight-pg"
+          },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "time_series",
+          "rawSql": "select day::timestamp as time, freight_billed from marts.mart_daily_ops where $__timeFilter(day::timestamp) order by 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyINR"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "title": "Transporter scorecard",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "freight-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "freight-pg"
+          },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "select transporter, shipments, on_time_pct, overbilled_pct, overbilled_amount, invoices_with_errors, delivered_not_invoiced from marts.mart_transporter_scorecard order by overbilled_amount desc"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Lane on-time % by month",
+      "type": "barchart",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "freight-pg"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "freight-pg"
+          },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "select lane, round(avg(on_time_pct), 1) as on_time_pct from marts.mart_lane_performance_monthly group by lane order by 2"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Dispute worklist (top 20)",
+      "type": "table",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "freight-pg"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 19,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "freight-pg"
+          },
+          "rawQuery": true,
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "select dispute_priority, invoice_id, transporter, lane, contracted_rate, freight_amount, freight_variance_pct from marts.mart_overbilling order by dispute_priority limit 20"
+        }
+      ]
+    }
+  ]
+}

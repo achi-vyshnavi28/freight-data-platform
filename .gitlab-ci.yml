@@ -1,0 +1,39 @@
+# Same pipeline for teams on GitLab.
+stages: [lint, test, run]
+
+default:
+  image: python:3.12-slim
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq postgresql-client > /dev/null
+    - pip install -q ".[dev]"
+
+variables:
+  POSTGRES_USER: fdp
+  POSTGRES_PASSWORD: fdp
+  POSTGRES_DB: fdp
+  FDP_PG_HOST: postgres
+  FDP_PG_DSN: postgresql://fdp:fdp@postgres:5432/fdp
+  AWS_DEFAULT_REGION: us-east-1
+
+lint:
+  stage: lint
+  services: [postgres:16]
+  script:
+    - ruff check . && ruff format --check .
+    - cd dbt && DBT_PROFILES_DIR=. dbt parse
+
+test:
+  stage: test
+  services: [postgres:16]
+  script:
+    - psql postgresql://fdp:fdp@postgres:5432/fdp -c "create database fdp_test"
+    - pytest -q
+
+e2e:
+  stage: run
+  services: [postgres:16]
+  script:
+    - python -m fdp.pipeline generate --shipments 300 --days 30 --ping-minutes 5
+    - python -m fdp.pipeline run
+  artifacts:
+    paths: [reports/]
