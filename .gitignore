@@ -9,3 +9,7 @@ dbt/logs/
 dbt/dbt_packages/
 logs/
 .env
+
+# local backup archives
+*.zip
+*.bundle
